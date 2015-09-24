@@ -17,6 +17,15 @@ public:
 	/*constructors*/
 	File() : name(""), path(""), rating(-1){};
 	File(std::string name, std::string path) : name(name), path(path), rating(-1){}
+
+	/*methds*/
+	int setRating(int);
+
+	int playVideo();
+
+	void printFile();
+
+	int exists();
 };
 
 class Folder{
@@ -32,13 +41,21 @@ public:
 	Folder(char* name) : name(name){}
 
 	/*methods*/
-	int loadFiles();		//laad alle files in de folder
 	int printFolder(char*);
-	int playRandom();
-	int rateRandom();
 
-	int saveDataFile();
+	int playRandom();
+	int rateRandom();//misschien options als argument meegeven en dan vragen via input
+
+	int loadFiles();		//laad alle files in de folder
 	int loadDataFile();
+	int saveDataFile();
+	int updateDataFile();
+
+	int getHighestRated(std::vector<File>&);
+	std::vector<File> Folder::getHighestRated();
+
+	int printFiles(std::vector<File>&);
+	int printFiles(std::vector<File>&, char);
 };
 
 #endif

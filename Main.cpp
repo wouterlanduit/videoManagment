@@ -3,6 +3,7 @@
 #include <cstring>
 #include <string>
 #include <crtdbg.h>
+#include <vector>
 
 #include "playBack.h"
 #include "files.h"
@@ -21,10 +22,14 @@ int main()
 	Folder folder(FOLDER);
 	folder.loadDataFile(); //eig load from stored data vs. update stored data nodig
 
+	folder.updateDataFile();
+
 	while (!stop){
 		cout << "choose what you want to do : " << endl;
 		cout << "\t 1. Rate a random trailer." << endl;
-		cout << "\t 2. Stop the program." << endl;
+		cout << "\t 2. Show top rated trailers." << endl;
+		cout << "\t 3. Stop the program." << endl;
+		
 		if (cin >> option){}
 		else{
 			option = 0;
@@ -33,6 +38,9 @@ int main()
 			cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 		}
 
+		cout << endl;
+
+		vector<File> highRated;
 		switch (option){
 		case 1:
 			while (!stop){
@@ -46,7 +54,33 @@ int main()
 			stop = 0;
 			break;
 		case 2:
-			cout << "Are you sure? (y/n)";
+			highRated = folder.getHighestRated();
+			folder.printFiles(highRated, 'a');
+			while (!stop){
+				cout << "Which high rated trailer would you like to see? (0 to watch none) : ";
+				if (cin >> option){
+					if (option >= 0 && option <= highRated.size()){
+						if (option){ //option != 0
+							highRated[option - 1].playVideo();
+						}
+						stop = 1;
+					}
+				}
+				else{
+					option = 0;
+					cin.clear(); // clears the error flags
+					// this line discards all the input waiting in the stream
+					cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+				}
+				if (!stop){
+					cout << "You didn't choose one of the available options. Choose again." << endl;
+				}
+			}
+			stop = 0; //buitenste lus
+			cout << endl << endl;
+			break;
+		case 3:
+			cout << "Are you sure? (y/n) : ";
 			cin >> answer;
 			if (answer == 'y' || answer == 'Y'){
 				stop = 1;
@@ -60,8 +94,5 @@ int main()
 	}
 
 	folder.saveDataFile();
-	//folder.playRandom();
-	
-	//playVideo(file.path.c_str(), file.name.c_str());
 	getchar();
 }

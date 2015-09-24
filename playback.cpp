@@ -12,10 +12,10 @@
 
 using namespace std;
 
-int playVideo(const char* folder, const char* file){
+int Video::playVideo(const char* folder, const char* file){
 	int returnValue = 1;
 	char* vlc = "\"c:\\Program Files (x86)\\videoLAN\\VLC\\vlc.exe\"";
-	char* options = "\-\-play\-and\-exit";
+	char* options = "--play-and-exit";
 	//char* folder = "C:\\Users\\wouter\\Documents\\varia\\youtube\\muziek";
 	//char* file = "Wuthering Heights - Carpe Noctem - Seize The Night.mp4";
 #ifdef USE_SYSTEM
