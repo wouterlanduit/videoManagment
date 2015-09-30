@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <ctime>
 
 #define DATA_FILE "videomanagment.dat"
 #define FOLDER "c:\\users\\wouter\\documents\\varia\\youtube\\trailers"
@@ -12,13 +13,14 @@ public:
 	std::string name;
 	std::string path;
 	int rating;			//rating op 10
-	//last viewed
+	time_t lastWatched;
 
 	/*constructors*/
 	File() : name(""), path(""), rating(-1){};
 	File(std::string name, std::string path) : name(name), path(path), rating(-1){}
 
 	/*methds*/
+	int rate();
 	int setRating(int);
 
 	int playVideo();
@@ -52,10 +54,12 @@ public:
 	int updateDataFile();
 
 	int getHighestRated(std::vector<File>&);
-	std::vector<File> Folder::getHighestRated();
+	std::vector<File*> Folder::getHighestRated();
+	std::vector<File*> getLeastRecentlyViewed();
 
 	int printFiles(std::vector<File>&);
 	int printFiles(std::vector<File>&, char);
+	int printFiles(std::vector<File*>&, char);
 };
 
 #endif

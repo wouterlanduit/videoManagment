@@ -22,13 +22,14 @@ int main()
 	Folder folder(FOLDER);
 	folder.loadDataFile(); //eig load from stored data vs. update stored data nodig
 
-	folder.updateDataFile();
+	//folder.updateDataFile();
 
 	while (!stop){
 		cout << "choose what you want to do : " << endl;
 		cout << "\t 1. Rate a random trailer." << endl;
 		cout << "\t 2. Show top rated trailers." << endl;
-		cout << "\t 3. Stop the program." << endl;
+		cout << "\t 3. Show least recently viewed trailers." << endl;
+		cout << "\t 4. Stop the program." << endl;
 		
 		if (cin >> option){}
 		else{
@@ -40,12 +41,13 @@ int main()
 
 		cout << endl;
 
-		vector<File> highRated;
+		vector<File*> highRated;
+		vector<File*> LRV;
 		switch (option){
 		case 1:
 			while (!stop){
 				folder.rateRandom();
-				cout << "Do you want to rate another trailer? (y/n)";
+				cout << "Do you want to rate another trailer? (y/n) : ";
 				cin >> answer;
 				if (answer != 'y' && answer != 'Y'){
 					stop = 1;
@@ -61,7 +63,12 @@ int main()
 				if (cin >> option){
 					if (option >= 0 && option <= highRated.size()){
 						if (option){ //option != 0
-							highRated[option - 1].playVideo();
+							highRated[option - 1]->playVideo();
+							cout << "Would you like to rerate this trailer? (y/n) : ";
+							cin >> answer;
+							if (answer == 'y' || answer == 'Y'){
+								highRated[option-1]->rate();
+							}
 						}
 						stop = 1;
 					}
@@ -80,6 +87,37 @@ int main()
 			cout << endl << endl;
 			break;
 		case 3:
+			LRV = folder.getLeastRecentlyViewed();
+			folder.printFiles(LRV, 'a');
+			while (!stop){
+				cout << "Which trailer would you like to see? (0 to watch none) : ";
+				if (cin >> option){
+					if (option >= 0 && option <= LRV.size()){
+						if (option){ //option != 0
+							LRV[option - 1]->playVideo();
+							cout << "Would you like to rate this trailer? (y/n) : ";
+							cin >> answer;
+							if (answer == 'y' || answer == 'Y'){
+								LRV[option - 1]->rate();
+							}
+						}
+						stop = 1;
+					}
+				}
+				else{
+					option = 0;
+					cin.clear(); // clears the error flags
+					// this line discards all the input waiting in the stream
+					cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+				}
+				if (!stop){
+					cout << "You didn't choose one of the available options. Choose again." << endl;
+				}
+			}
+			stop = 0; //buitenste lus
+			cout << endl << endl;
+			break;
+		case 4:
 			cout << "Are you sure? (y/n) : ";
 			cin >> answer;
 			if (answer == 'y' || answer == 'Y'){

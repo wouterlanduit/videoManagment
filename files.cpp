@@ -3,6 +3,8 @@
 #include <vector>
 #include <math.h>
 #include <sys/stat.h> //to use stat() for testing filen existence
+#include <ctime>
+#include <map>
 #include "files.h"
 #include "playback.h"
 
@@ -15,24 +17,55 @@ int File::setRating(int rating){
 		return 0;
 	}
 	else{
-		cout << "This rating is not possible";
 		return -1;	//too large or too small
 	}
 }
 
+int File::rate(){
+	int rating;
+	int stop = 0;
+	while (!stop){
+		cout << "Give your rating (/10) : ";
+		if (cin >> rating){
+			if (this->setRating(rating) == 0){
+				stop = 1;
+			}
+		}
+		else{
+			cin.clear(); // clears the error flags
+			// this line discards all the input waiting in the stream
+			cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+		}
+		if (!stop){
+			cout << "invalid input." << endl;
+		}
+	}
+	
+
+	return 0;
+}
+
 int File::playVideo(){
-	return Video::playVideo(this->path.c_str(), this->name.c_str());
+	int success = Video::playVideo(this->path.c_str(), this->name.c_str());
+	if (success == 0){
+		time(&(this->lastWatched));
+	}
+	return success;
 }
 
 void File::printFile(){
-	cout << this->name << "\t(" << this->rating << "/10)" << endl;
+	cout << this->name << "\t(";
+	if (this->rating > -1)
+		cout << this->rating << "/10)" << endl;
+	else
+		cout << "unrated" << ")" << endl;
 }
 
 int File::exists(){
 	std::tr2::sys::path dir_path(this->path);
 	std::tr2::sys::path file(this->name);
 	std::tr2::sys::path full_path = dir_path / file;
-	file_status stat = status(full_path);	//1: file_not_found
+	file_status stat = status(full_path);	// 1: file_not_found
 											// 2:regular_file
 
 	return (stat.type() != 1);
@@ -75,12 +108,14 @@ int Folder::rateRandom(){
 		cin.clear(); // clears the error flags
 		// this line discards all the input waiting in the stream
 		cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+		return -1;
 	}
 	if (rating >= 0 && rating <= 10){
 		file->rating = rating;
+		return 0;
 	}
 
-	return 0;
+	return -1;
 }
 
 int Folder::loadFiles(){
@@ -90,6 +125,7 @@ int Folder::loadFiles(){
 			cout << itr->path().filename() << ' '; // display filename only
 			if (is_regular_file(itr->status()) && itr->path().filename()!= DATA_FILE){
 				File file(itr->path().filename(), dir_path.directory_string());
+				file.lastWatched = time(nullptr);
 				this->files.push_back(file);
 				cout << " [" << file_size(itr->path()) << ']';
 			}
@@ -122,6 +158,7 @@ int Folder::saveDataFile(){
 		fwrite(this->files[i].name.c_str(), sizeof(char), this->files[i].name.length(), file);
 		//fwrite(" &|& ", sizeof(char), 5, file);
 		fwrite(&(this->files[i].rating), sizeof(int), 1, file);
+		fwrite(&(this->files[i].lastWatched), sizeof(time_t), 1, file);
 		fwrite("\n", sizeof(char), 1, file);
 	}
 
@@ -156,6 +193,7 @@ int Folder::loadDataFile(){
 					videoFile.name = name;
 					delete[] name;
 					fread(&(videoFile.rating), sizeof(int), 1, dataFile);
+					fread(&(videoFile.lastWatched), sizeof(time_t), 1, dataFile);
 					//fscanf mogelijk???
 					this->files.push_back(videoFile);
 				}
@@ -191,7 +229,7 @@ int Folder::updateDataFile(){//wat doen als er nog folders inzitten (overloaden 
 					}
 					if (itr_list->name == itr_new->path().filename()){
 						/*file bestond al*/
-						cout << itr_list->name << endl;
+						//cout << itr_list->name << endl;
 						itr_list++;
 						itr_new++;
 						element_nr++;
@@ -269,8 +307,8 @@ int Folder::getHighestRated(vector<File>& bestVideos){ //enkel deze met de hoogs
 		return 0;
 }
 
-vector<File> Folder::getHighestRated(){
-	std::vector<File> sorted[11];
+vector<File*> Folder::getHighestRated(){
+	std::vector<File*> sorted[11]; //pointers om geheugenruimte te sparen
 
 	std::vector<File>::iterator it = (this->files).begin();
 
@@ -278,16 +316,16 @@ vector<File> Folder::getHighestRated(){
 
 	while (it != end){
 		if (it->rating >= 0){
-			sorted[it->rating].push_back(*it);
+			sorted[it->rating].push_back(&(*it));
 		}
 		it++;
 	}
 
-	std::vector<File> highestRated;
+	std::vector<File*> highestRated;
 
 	int j = 10;
 	while (highestRated.size() < 10 && j >= 0){
-		for (int i = 0; i < sorted[j].size(); i++){
+		for (int i = 0; i < sorted[j].size(); i++){//misschien geen lus nodig? bestaat er een geoverloade versie die dit kan?
 			highestRated.push_back(sorted[j][i]);
 		}
 		j--;
@@ -295,6 +333,32 @@ vector<File> Folder::getHighestRated(){
 
 	return highestRated;
 
+}
+
+vector<File*> Folder::getLeastRecentlyViewed(){
+	//eerst allemaal sorteren?-> in multimap. nadeel: veel geheugengebruik
+	std::multimap<time_t, File*> sorted;
+
+	std::vector<File>::iterator it = (this->files).begin();
+
+	std::vector<File>::iterator end = this->files.end();
+
+	while (it != end){
+		sorted.insert(std::pair<time_t, File*>((it->lastWatched), &(*it)));
+		it++;
+	}
+
+	std::vector<File*> result;
+	std::multimap<time_t, File*>::iterator mm_it = sorted.begin();
+	std::multimap<time_t, File*>::iterator mm_it_end = sorted.end();
+	int count = 0;
+
+	while (count < 15 && mm_it != mm_it_end){
+		result.push_back(mm_it->second);
+		count++;
+		mm_it++;
+	}
+	return result;
 }
 
 int Folder::printFiles(vector<File>& files){
@@ -319,6 +383,24 @@ int Folder::printFiles(vector<File>& files, char style){// style: arabic numberi
 			cout << " (" << i << ") ";
 		}
 		it->printFile();
+		it++;
+		i++;
+	}
+
+	cout << endl << endl;
+
+	return 0;
+}
+
+int Folder::printFiles(vector<File*>& files, char style){// style: arabic numbering ('a'), 
+	std::vector<File*>::iterator it = files.begin();
+	int i = 1;
+
+	while (it != files.end()){
+		if (style == 'a'){
+			cout << " (" << i << ") ";
+		}
+		(*it)->printFile();
 		it++;
 		i++;
 	}

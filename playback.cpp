@@ -1,4 +1,7 @@
-#define USE_SYSTEM
+//#define USE_SYSTEM
+#ifndef USE_SYSTEM
+	//#define USE_API
+#endif
 
 #include "playback.h"
 #include <iostream>
@@ -6,7 +9,7 @@
 #ifdef USE_SYSTEM
 	#include <cstdlib> //system()
 #else
-	#include <windows.h> //ShellExecute()
+	#include <windows.h> //ShellExecute() && createProcess()
 	#include <shellapi.h>
 #endif
 
@@ -14,19 +17,22 @@ using namespace std;
 
 int Video::playVideo(const char* folder, const char* file){
 	int returnValue = 1;
-	char* vlc = "\"c:\\Program Files (x86)\\videoLAN\\VLC\\vlc.exe\"";
+	char* vlc = "\"C:\\Program Files (x86)\\videoLAN\\VLC\\vlc.exe\"";
 	char* options = "--play-and-exit";
-	//char* folder = "C:\\Users\\wouter\\Documents\\varia\\youtube\\muziek";
-	//char* file = "Wuthering Heights - Carpe Noctem - Seize The Night.mp4";
-#ifdef USE_SYSTEM
+#if defined USE_SYTEM
 	int length = 1 + strlen(vlc) + 2 + strlen(folder) + 1 + strlen(file) + 2 + strlen(options) + 2;
-#else
+#elif defined USE_API
 	int length = 1 + strlen(folder) + 1 + strlen(file) + 2 + strlen(options) + 2;
+#else
+	int length = strlen(vlc) + 2 + strlen(folder) + 1 + strlen(file) + 2 + strlen(options) + 1;
 #endif
 	char* command = new char[length];
+	command[0] = '\0';		//so strcat can be used as first command in all cases
 
-	strcpy(command, "\"");
-#ifdef USE_SYSTEM
+#if defined USE_SYTEM || defined USE_API
+	strcat(command, "\"");
+#endif
+#ifndef USE_API
 	strcat(command, vlc);
 	strcat(command, " \"");
 #endif
@@ -35,7 +41,9 @@ int Video::playVideo(const char* folder, const char* file){
 	strcat(command, file);
 	strcat(command, "\" ");
 	strcat(command, options);
+#if defined USE_SYTEM || defined USE_API
 	strcat(command, "\"");
+#endif
 
 	cout << command << endl << endl;
 
@@ -43,9 +51,39 @@ int Video::playVideo(const char* folder, const char* file){
 	returnValue = system(command);
 	if (returnValue){
 		cout << "Could not open the program" << endl;
+		returnValue = -1;
 	}
-#else
+#elif defined USE_API
 	ShellExecute(NULL, "open", vlc, command, NULL, SW_SHOWNORMAL);
+	//fout opvangen
+#else
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+
+	//allocate memory
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+
+	if (!CreateProcess(NULL, //use commandline
+		command,	//commandline					//! niet te veel quotes
+		NULL,	//don't inherit process handle
+		NULL,	//don't inherit thread handle
+		FALSE,	//disable handle inheritance
+		0,		//no creation flags
+		NULL,	//use parent's environment block
+		NULL,	//use parent's directory
+		&si,
+		&pi)){
+		cout << "Failed to open VLC" << endl;
+		returnValue = -1;
+	}
+	// parent will wait for the child to complete
+	//WaitForSingleObject(pi.hProcess, INFINITE);
+	//MessageBox(NULL, "Child Complete", "BS - Process creation", MB_OK);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+	returnValue = 0; //can't return yet, because delete[] command hasn't been done
 #endif
 
 	delete[] command;
