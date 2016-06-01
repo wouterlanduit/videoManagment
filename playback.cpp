@@ -6,20 +6,56 @@
 #include "playback.h"
 #include <iostream>
 #include <stdio.h>
+#ifdef USE_QT_PROCESS
+    #include <QProcess>
+    #include <QString>
+    #include <QStringList>
+#else
 #ifdef USE_SYSTEM
 	#include <cstdlib> //system()
 #else
 	#include <windows.h> //ShellExecute() && createProcess()
 	#include <shellapi.h>
 #endif
+#endif
+
+
 
 using namespace std;
 
+#ifdef USE_QT_PROCESS
+
+int Video::playVideo(const char* folder, const char* file){
+    int retVal = 1;
+    QString vlc = "C:/Program Files (x86)/videoLAN/VLC/vlc.exe";
+    QString video = folder;
+    video.append("\\");
+    video.append(file);
+    QStringList options;
+    options << video << "--play-and-exit";
+
+    QProcess *process = new QProcess();
+    //process->start(vlc, options);
+    process->startDetached(vlc, options);
+
+    if (!process->waitForFinished(-1)){
+        retVal = -1;
+    }else{
+        retVal = 0;
+    }
+
+    delete process;
+    return retVal;
+
+}
+
+#else
+
 int Video::playVideo(const char* folder, const char* file){
 	int returnValue = 1;
-	char* vlc = "\"C:\\Program Files (x86)\\videoLAN\\VLC\\vlc.exe\"";
-	char* options = "--play-and-exit";
-#if defined USE_SYTEM
+    const char* vlc = "\"C:\\Program Files (x86)\\videoLAN\\VLC\\vlc.exe\"";
+    const char* options = "--play-and-exit";
+#if defined USE_SYSTEM
 	int length = 1 + strlen(vlc) + 2 + strlen(folder) + 1 + strlen(file) + 2 + strlen(options) + 2;
 #elif defined USE_API
 	int length = 1 + strlen(folder) + 1 + strlen(file) + 2 + strlen(options) + 2;
@@ -29,7 +65,7 @@ int Video::playVideo(const char* folder, const char* file){
 	char* command = new char[length];
 	command[0] = '\0';		//so strcat can be used as first command in all cases
 
-#if defined USE_SYTEM || defined USE_API
+#if defined USE_SYSTEM || defined USE_API
 	strcat(command, "\"");
 #endif
 #ifndef USE_API
@@ -41,7 +77,7 @@ int Video::playVideo(const char* folder, const char* file){
 	strcat(command, file);
 	strcat(command, "\" ");
 	strcat(command, options);
-#if defined USE_SYTEM || defined USE_API
+#if defined USE_SYSTEM || defined USE_API
 	strcat(command, "\"");
 #endif
 
@@ -66,7 +102,7 @@ int Video::playVideo(const char* folder, const char* file){
 	ZeroMemory(&pi, sizeof(pi));
 
 	if (!CreateProcess(NULL, //use commandline
-		command,	//commandline					//! niet te veel quotes
+        command,	//commandline					//! niet te veel quotes
 		NULL,	//don't inherit process handle
 		NULL,	//don't inherit thread handle
 		FALSE,	//disable handle inheritance
@@ -90,3 +126,5 @@ int Video::playVideo(const char* folder, const char* file){
 
 	return returnValue;
 }
+
+#endif
