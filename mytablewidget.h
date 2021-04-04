@@ -1,5 +1,5 @@
-#ifndef _MYTABLEWIDGET_H
-#define _MYTABLEWIDGET_H
+#ifndef MYTABLEWIDGET_H
+#define MYTABLEWIDGET_H
 
 #include <QTableWidgetItem>
 

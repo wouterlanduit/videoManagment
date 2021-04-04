@@ -14,7 +14,7 @@
 #ifdef USE_SYSTEM
 	#include <cstdlib> //system()
 #else
-	#include <windows.h> //ShellExecute() && createProcess()
+    #include <Windows.h> //ShellExecute() && createProcess()
 	#include <shellapi.h>
 #endif
 #endif
@@ -27,26 +27,29 @@ using namespace std;
 
 int Video::playVideo(const char* folder, const char* file){
     int retVal = 1;
-    QString vlc = "C:/Program Files (x86)/videoLAN/VLC/vlc.exe";
+    QString vlc = "C:\\Program Files\\videoLAN\\VLC\\vlc.exe";
     QString video = folder;
     video.append("\\");
     video.append(file);
+    video.replace('/', '\\');
     QStringList options;
     options << video << "--play-and-exit";
 
     QProcess *process = new QProcess();
-    //process->start(vlc, options);
-    process->startDetached(vlc, options);
-
-    if (!process->waitForFinished(-1)){
+    try {
+        //process->start(vlc, options);
+        if(process->startDetached(vlc, options)){
+            retVal = 0;
+        }else{
+            retVal = -1;
+        }
+    } catch (const std::exception& e) {
         retVal = -1;
-    }else{
-        retVal = 0;
+        printf("%s", e.what());
     }
 
     delete process;
     return retVal;
-
 }
 
 #else

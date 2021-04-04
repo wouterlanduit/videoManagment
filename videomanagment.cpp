@@ -20,38 +20,40 @@
 #include <iostream>
 #include <filesystem>
 #include <ctime>
+#include <time.h>
+#include <string>
+#include <fstream>
 
 #include "videomanagment.h"
 #include "ui_videomanagment.h"
 #include "playback.h"
 #include "files.h"
-#include <string>
-#include "dialog.h"
+#include "optionsdialog.h"
+#include "ratedialog.h"
 #include "options.h"
 #include "mytablewidget.h"
+#include "settings.h"
 
 using namespace std;
 
 VideoManagment::VideoManagment(QWidget *parent): QMainWindow(parent), ui(new Ui::VideoManagment){
-    folder = NULL;
-    pathOptions = new QString[NUM_OPTIONS];
+    folder = nullptr;
     ui->setupUi(this);
     setupTable();
     this->loadSettings();
     ui->actionSave->setEnabled(false);
-    if(pathOptions[OPTION_STDOPENCHECK].toInt()==Qt::Checked){
-        if(!pathOptions[OPTION_STDOPEN].isEmpty()){
-            openFolder(pathOptions[OPTION_STDOPEN]);
+    if(settings.getSetting(OPTION_STDOPENCHECK).toInt() == Qt::Checked){
+        if(!settings.getSetting(OPTION_STDOPEN).isEmpty()){
+            openFolder(settings.getSetting(OPTION_STDOPEN));
         }
     }
 }
 
 VideoManagment::~VideoManagment(){
-    if(folder != NULL){
+    if(folder != nullptr){
         delete folder;
     }
     this->clearTable();
-    delete[] pathOptions;
     delete ui;
 }
 
@@ -64,16 +66,16 @@ void VideoManagment::setupTable(){
 }
 
 void VideoManagment::fillTable(Folder* folder){
-    int num_videos = folder->files.size();
+    unsigned int num_videos = folder->files.size();
 
     ui->videoTable->clear();
 
     ui->videoTable->setColumnCount(3);
-    ui->videoTable->setRowCount(num_videos);
+    ui->videoTable->setRowCount(static_cast<int>(num_videos));
     QStringList column_titles;
     column_titles << "Video" << "Rating" << "Last viewed";
     ui->videoTable->setHorizontalHeaderLabels(column_titles);
-    for(int i=0; i<num_videos;i++){
+    for(unsigned int i=0; i<num_videos;i++){
         File* file = &(folder->files[i]);
         QTableWidgetItem *video = new QTableWidgetItem(file->name.c_str());
         //video->setData(Qt::UserRole, &file); //dit lukt niet
@@ -103,9 +105,9 @@ void VideoManagment::fillTable(Folder* folder){
         rating->setData(Qt::UserRole+1, file->rating);
         last_viewed->setData(Qt::UserRole+1, file->lastWatched);
 
-        ui->videoTable->setItem(i, 0, video);
-        ui->videoTable->setItem(i, 1, rating);
-        ui->videoTable->setItem(i, 2, last_viewed);
+        ui->videoTable->setItem(static_cast<int>(i), 0, video);
+        ui->videoTable->setItem(static_cast<int>(i), 1, rating);
+        ui->videoTable->setItem(static_cast<int>(i), 2, last_viewed);
     }
 
     //sorting als columnheader geklikt wordt
@@ -130,46 +132,15 @@ void VideoManagment::clearTable(){
 }
 
 
-void VideoManagment::loadSettings(){    //ik doe hier precies wel weinig veiligheidschecks
-    ifstream file;
-    file.open(SETTINGS_FILE, ios::in);
-    int i;
-    if(file.is_open()){
-        string temp;
-        i=0;
-        while(file>>temp && i<NUM_OPTIONS){//reads untill '/n' or ' ' (second conditie is for safety)
-            if(i<NUM_OPTIONS){
-                if(temp[temp.size()-1] == ';'){ //einde van de optie is bereikt
-                    //het eindteken eraf halen
-                    std::string::iterator it = temp.end();
-                    it--;
-                    temp.erase(it);
-                    //toevoegen aan de optie
-                    this->pathOptions[i] += temp.c_str();
-                    //klaar voor de volgende optie
-                    i++;
-                }else{
-                    this->pathOptions[i] += temp.c_str();
-                    this->pathOptions[i] += ' ';
-                }
-            }
-        }
-        file.close();
-    }else{
-        // settings file bestaat misschien nog niet -> een maken met defaults geladen
-    }
+void VideoManagment::loadSettings(){
+    settings.loadSettings(SETTINGS_FILE);
 
     return;
 }
 
 void VideoManagment::openFolder(QString folderName){
-    std::string str = std::tr2::sys::path(folderName.toStdString()).directory_string();
-    char* fold = new char[str.size()+1];
-    for(unsigned int i=0; i<=str.size();i++){
-        fold[i] = str[i];
-    }
-    fold[str.size()] = '\0';
-    folder = new Folder(fold);
+    std::string str = folderName.toStdString();
+    folder = new Folder(str.c_str());
     folder->loadDataFile();
     folder->updateDataFile();
     this->fillTable(folder);
@@ -185,20 +156,15 @@ void VideoManagment::cellDoubleClicked(QTableWidgetItem* item){
     if(item->column()!=0){
         item = this->ui->videoTable->item(item->row(), 0);
     }
-    QString tekst = item->text();
-    std::string str = tekst.toStdString();
-    char* fileName = new char[str.size()+1];
-    for(unsigned int i=0; i<=str.size();i++){
-        fileName[i] = str[i];
-    }
+    QString text = item->text();
+    std::string fileName = text.toStdString();
     File* file = this->folder->searchFile(this->folder->name.c_str(), fileName);
     //File* file = item->data(Qt::UserRole);    //dit lukt niet
-    delete[] fileName;
-    if(file != NULL){
+    if(file != nullptr){
         file->playVideo();
         this->folder->unsaved = true;
         //give rating
-        if(NUM_OPTIONS>OPTION_DEFAULTCLICK && (pathOptions[OPTION_DEFAULTCLICK].toInt() == Qt::Checked)){
+        if(NUM_OPTIONS>OPTION_DEFAULTCLICK && (settings.getSetting(OPTION_DEFAULTCLICK).toInt() == Qt::Checked)){
             switch(QMessageBox::question(this,"Rate","Would you like to rate this trailer?", QMessageBox::Yes, QMessageBox::No)){
             case QMessageBox::Yes:{
                 int rating = file->rate();
@@ -224,7 +190,7 @@ void VideoManagment::cellDoubleClicked(QTableWidgetItem* item){
 }
 
 void VideoManagment::cellRightClicked(const QPoint &point){
-    qDebug("item clicked");
+    // qDebug("item clicked");
     QMenu menu(this);
     QAction *play = menu.addAction("Play trailer");
     QAction *rate = menu.addAction("Change rating");
@@ -242,7 +208,7 @@ void VideoManagment::cellRightClicked(const QPoint &point){
         }
         File* file = this->folder->searchFile(this->folder->name.c_str(), fileName);
         delete[] fileName;
-        if(file != NULL){
+        if(file != nullptr){
             int rating = file->rate();
             if(rating >= 0){
                 this->folder->unsaved = true;
@@ -255,7 +221,6 @@ void VideoManagment::cellRightClicked(const QPoint &point){
         }
     }
 }
-
 
 
 
@@ -275,19 +240,15 @@ void VideoManagment::on_actionExit_triggered(){
             switch(QMessageBox::question(this,"Exit","You have unsaved changes, would you like to save them?", QMessageBox::Yes, QMessageBox::No, QMessageBox::Cancel)){
             case QMessageBox::Yes:
                 folder->saveDataFile();
+                exit(0);
             case QMessageBox::No:
                 exit(0);
-                break;
             case QMessageBox::Cancel:
                 break;
             };
         }else{
-            switch(QMessageBox::question(this,"Exit","Are you sure?", QMessageBox::Yes, QMessageBox::No)){
-            case QMessageBox::Yes:
+            if(QMessageBox::question(this,"Exit","Are you sure?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes){
                 exit(0);
-                break;
-            case QMessageBox::No:
-                break;
             };
         }
     }else{
@@ -297,22 +258,9 @@ void VideoManagment::on_actionExit_triggered(){
 }
 
 void VideoManagment::on_actionOpen_triggered(){
-    //QString filename = QFileDialog::getOpenFileName(this, "Open File", this->optStdFolder,"Data files (*.dat);;All files (*.*)");
-    QString folderName = QFileDialog::getExistingDirectory(this, "Open folder",this->pathOptions[0]);
-    //if( !filename.isEmpty() ){
+    QString folderName = QFileDialog::getExistingDirectory(this, "Open folder",this->getStdFolder());
     if(!folderName.isEmpty()){
         openFolder(folderName);
-        /*std::string str = std::tr2::sys::path(folderName.toStdString()).directory_string();
-        char* fold = new char[str.size()+1];
-        for(unsigned int i=0; i<=str.size();i++){
-            fold[i] = str[i];
-        }
-        fold[str.size()] = '\0';
-        folder = new Folder(fold);
-        folder->loadDataFile();
-        folder->updateDataFile();
-        this->fillTable(folder);
-        ui->actionSave->setEnabled(true);*/
     }
     return;
 }
@@ -322,21 +270,24 @@ void VideoManagment::on_actionOpen_triggered(){
 /************/
 
 void VideoManagment::on_actionRate_random_triggered(){
-    if(folder == NULL){
+    if(folder == nullptr){
         QMessageBox::critical(this, "ERROR: NO FILE", "You haven't opened a file yet.", QMessageBox::Ok);
     }else{
         File* file = folder->playRandom();
-        file->rate();
+        if(file)
+        {
+            file->rate();
+        }
     }
 
     return;
 }
 
 void VideoManagment::on_actionWatch_random_triggered(){
-    if(folder == NULL){
+    if(folder == nullptr){
         QMessageBox::critical(this, "ERROR: NO FILE", "You haven't opened a file yet.", QMessageBox::Ok);
     }else{
-
+        folder->playRandom();
     }
 
     return;
@@ -347,23 +298,21 @@ void VideoManagment::on_actionWatch_random_triggered(){
 /************/
 
 void VideoManagment::on_actionOptions_triggered(){
-    OptionsDialog* options = new OptionsDialog(this->pathOptions);
+    OptionsDialog* options = new OptionsDialog(settings);
     if(options->exec()){
-        ofstream file;
-        file.open(SETTINGS_FILE, ios::out);
-        if (!file.is_open()){
-            QMessageBox::critical(this, "ERROR: NO FILE", "Error saving settings", QMessageBox::Ok);
-        }else{
+        for(int i=0;i<NUM_OPTIONS; i++){
+            settings.updateSetting(i, options->getOption(i));
+        }
 
-            for(int i=0;i<NUM_OPTIONS; i++){
-                //opslaan in data file (voor toekomstige sessies)
-                file << options->getOption(i).toStdString() << ';' << endl;
-                //aanpassen voor huidige sessie
-                this->pathOptions[i] = options->getOption(i);
-            }
-            file.close();        
+        switch(settings.saveSettings(SETTINGS_FILE)){
+            case -1:
+                QMessageBox::critical(this, "ERROR: NO FILE", "Error saving settings", QMessageBox::Ok);
+                break;
         }
     }
+
+
+
     delete options;
     return;
 }

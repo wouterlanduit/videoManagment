@@ -1,5 +1,5 @@
-#ifndef _PLAYBACK_H
-#define _PLAYBACK_H
+#ifndef PLAYBACK_H
+#define PLAYBACK_H
 
 #include "options.h"
 

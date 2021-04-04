@@ -15,6 +15,8 @@ int main(int argc, char *argv[])
 /*TO DO*/
 /*******/
 
+//0. Datum opslaan is naar de ballen -> fix zo rap mogelijk
+
 //1. Log anders organiseren: nu onmogelijk om meerdere filesmanagmentens te loggen
 
 //2. Probleem met niet-hoofdlettergevoeligheid van File::exists()-> mooier proberen oplossen
@@ -27,10 +29,8 @@ int main(int argc, char *argv[])
 
 //6. random trailers bekijken met opgegeven rating (lijst van ratings/min rating)
 
+//7. meerdere folders tegelijk open kunnen hebben staan: lijst van pointers naar Folder + ref naar huidige folder -> extra menu met openstaande folder in
+
 //9. wat als er subfolders zijn??
 
-//10. Option klasse maken: (of union?)
-        //file: QString
-        //check: boolean
-
-//11. Wat als log-entry niet gevonden wordt (ondertussen hernoemd of verwijderd)? -> geen probleem denk ik: je laadt de logs in op datafile voordat je ze update met nieuwe of gedeletete file
+//10. Wat als log-entry niet gevonden wordt (ondertussen hernoemd of verwijderd)? -> geen probleem denk ik: je laadt de logs in op datafile voordat je ze update met nieuwe of gedeletete file

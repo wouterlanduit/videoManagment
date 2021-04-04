@@ -1,5 +1,5 @@
-#ifndef _FILES_H
-#define _FILES_H
+#ifndef FILES_H
+#define FILES_H
 
 #include <vector>
 #include <string>
@@ -10,7 +10,6 @@
 
 #define DATA_FILE "videomanagment.dat"
 #define LOG_FILE "videomanagment.log"
-#define FOLDER "c:\\users\\wouter\\documents\\varia\\youtube\\trailers"
 
 
 class File{
@@ -36,6 +35,8 @@ public:
 	int exists();
 };
 
+// TODO create class regularFile and make Folder and regular file extend from file
+
 class Folder{   /*extends File????*/
 public:
     //char* name;
@@ -49,7 +50,7 @@ public:
         unsaved = false;
 	}
 
-    Folder(char* name) : name(name){
+    Folder(const char* name) : name(name){
         unsaved = false;
     }
 

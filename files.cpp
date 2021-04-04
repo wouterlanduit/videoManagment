@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <filesystem>
 #include <vector>
 #include <math.h>
@@ -7,13 +8,13 @@
 #include <map>
 #include "files.h"
 #include "playback.h"
-#include "dialog.h"
+#include "optionsdialog.h"
+#include "ratedialog.h"
 
 #include <QString>
 #include <QProcess>
 
 using namespace std;
-using namespace std::tr2::sys; //https://msdn.microsoft.com/en-us/library/hh874769.aspx
 
 /********/
 /* FILE */
@@ -24,7 +25,7 @@ int File::setRating(int rating, bool log){
 		this->rating = rating;
         if(log){
             ofstream log;
-            log.open(LOG_FILE, ios::app);
+            log.open(LOG_FILE, ofstream::app);
             if (!log.is_open())
             {
                 log.clear();
@@ -58,7 +59,7 @@ int File::rate(){
 	}
 }
 #else
-/*return rating of -1 bij cancel*/
+/*return rating of -1 upon cancel*/
 int File::rate(){
     int newRating = this->rating;
     //rating widget oproepen
@@ -102,14 +103,10 @@ void File::printFile(){
 #endif
 
 int File::exists(){
-	std::tr2::sys::path dir_path(this->path);
-	std::tr2::sys::path file(this->name);
-	std::tr2::sys::path full_path = dir_path / file;
-    //volgende regel is niet hoofdlettergevoelig
-	file_status stat = status(full_path);	// 1: file_not_found
-                                            // 2: regular_file
+    struct stat buf;
+    string fullPath = this->path + "\\" + this->name;
 
-	return (stat.type() != 1);
+    return (stat(fullPath.c_str(), &buf) == 0);
 }
 
 /**********/
@@ -134,13 +131,17 @@ int Folder::printFolder(char* folder){
 #endif
 
 File* Folder::playRandom(){
-	int count = this->files.size();
-	std::srand((int)std::time(0));
+    int count = static_cast<int>(this->files.size());
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
 	int random = rand();
-    File* file = &(this->files[random%count]);
-    file->playVideo();
-    unsaved = true;//checken of afspelen gelukt is?
-    return file;//checken of afspelen gelukt is?
+    File* file = &(this->files[static_cast<unsigned int>(random%count)]);
+    if(file->playVideo() == 0){
+        unsaved = true;
+    }
+    else {
+        file = nullptr;
+    }
+    return file;
 }
 
 #ifdef WITH_CONSOLE
@@ -161,18 +162,24 @@ int Folder::rateRandom(){
 #else
 int Folder::rateRandom(){
     File* file = this->playRandom();
-    unsaved = true;//checken of afspelen gelukt is?
-    return file->rate();
+    int ret = -1;
+    if(file)
+    {
+        unsaved = true;
+        ret = file->rate();
+    }
+
+    return ret;
 }
 #endif
 
 int Folder::loadFiles(){
-	path dir_path(this->name);
-	if (is_directory(dir_path)){//dit moet eigenlijk enkel in de bovenliggende functie gecontrolleerd worden (als deze functie nooit apart wordt opgeroepen)
-		for (directory_iterator itr(dir_path); itr != directory_iterator(); ++itr){
+    std::experimental::filesystem::path dir_path(this->name);
+    if (std::experimental::filesystem::is_directory(dir_path)){
+        for (std::experimental::filesystem::directory_iterator itr(dir_path); itr != std::experimental::filesystem::directory_iterator(); ++itr){
 			cout << itr->path().filename() << ' '; // display filename only
 			if (is_regular_file(itr->status()) && itr->path().filename()!= DATA_FILE){
-				File file(itr->path().filename(), dir_path.directory_string());
+                File file(itr->path().filename().string(), this->name);
                 file.lastWatched = NULL;
 				this->files.push_back(file);
 				cout << " [" << file_size(itr->path()) << ']';
@@ -191,18 +198,18 @@ int Folder::loadFiles(){
 }
 
 int Folder::saveDataFile(){
-    if(this != NULL){
-        char* file_path = new char[this->name.size() + 1 + strlen(DATA_FILE) + 1];
+    string filePath = this->name + "/" + DATA_FILE;    // TODO method to concat paths
+    int ret = 0;
 
-        strcpy(file_path, this->name.c_str());
-        strcat(file_path, "\\");
-        strcat(file_path, DATA_FILE);
+    FILE* file;
 
-        FILE* file = fopen(file_path, "wb+");
+    errno_t err = fopen_s(&file, filePath.c_str(), "wb+");
 
+    if(file != nullptr)
+    {
         //alles wegschrijven
         for (unsigned int i = 0; i < this->files.size(); i++){
-            int length = this->files[i].name.size()*sizeof(char);
+            int length = static_cast<int>(this->files[i].name.size()*sizeof(char));
             fwrite(&length, sizeof(int), 1, file);
             //fwrite(" &|& ", sizeof(char), 5, file);
             fwrite(this->files[i].name.c_str(), sizeof(char), this->files[i].name.length(), file);
@@ -217,38 +224,38 @@ int Folder::saveDataFile(){
         //delete log
         remove(LOG_FILE);
         this->unsaved = false;
-
-        delete[] file_path;
+    }
+    else {
+        ret = -1;
+        printf(strerror(err));
     }
 
-	return 0;
+    return ret;
 }
 
 /**
- * @brief laad de datafile van de Folder
+ * @brief load the data file of the folder
  * @param void
- * @return  0 , alles succesvol
+ * @return  0 , success
  **/
 
 int Folder::loadDataFile(){
-	path dir_path(this->name);
+    std::experimental::filesystem::path dir_path(this->name);
     // checken dat de opgegeven naam wel degelijk een file is die bestaat
-	if (is_directory(dir_path)){
-        // creeeren van het pad naar de datafile
-        char* file_path = new char[this->name.size() + 1 + strlen(DATA_FILE) + 1];
-        strcpy(file_path, this->name.c_str());
-		strcat(file_path, "\\");
-		strcat(file_path, DATA_FILE);
+    if (std::experimental::filesystem::is_directory(dir_path)){
+        // create path to data file
+        string filePath = this->name + "\\" + DATA_FILE;
         //openen datafile
-		FILE* dataFile = fopen(file_path, "rb");
-		if (dataFile == NULL){//er was nog geen datafile
+        FILE* dataFile;
+        fopen_s(&dataFile, filePath.c_str(), "rb");
+        if (dataFile == nullptr){//er was nog geen datafile
 			this->loadFiles();
 		}
 		else{
 			File videoFile;
 			do{
-				int length = 0;
-                videoFile.path = dir_path.directory_string();
+                unsigned int length = 0;
+                videoFile.path = this->name;
                 // lees lengte van naam van videofile
 				fread(&length, sizeof(int), 1, dataFile);
 				if (length != 0){
@@ -263,10 +270,9 @@ int Folder::loadDataFile(){
 					this->files.push_back(videoFile);
 				}
 				
-			} while (getc(dataFile) != EOF);	
+            } while (getc(dataFile) != EOF);
+            fclose(dataFile);
 		}
-
-		delete[] file_path;
 
 
 		//log file aanpassingen toepassen (houdt last viewed niet bij)
@@ -312,12 +318,12 @@ int Folder::loadDataFile(){
  **/
 
 int Folder::updateDataFile(){//wat doen als er nog folders inzitten (overloaden met functie die verder pad als argument heeft?)
-	path dir_path(this->name);
+    std::experimental::filesystem::path dir_path(this->name);
 	std::vector<File>::iterator itr_list = this->files.begin();
 	std::vector<File>::iterator itr_list_end = this->files.end();
-	directory_iterator itr_new(dir_path);
+    std::experimental::filesystem::directory_iterator itr_new(dir_path);
 	
-	if (is_directory(dir_path)){
+    if (std::experimental::filesystem::is_directory(dir_path)){
 		if (this->files.size() == 0){
 			this->loadFiles();
 		}
@@ -326,10 +332,10 @@ int Folder::updateDataFile(){//wat doen als er nog folders inzitten (overloaden 
 			while (itr_list != itr_list_end){
 				if (itr_list->exists()){ 
 					//file has not been deleted
-					if (itr_new->path().filename() == DATA_FILE){
+                    /*if (itr_new->path().filename() == DATA_FILE){
 						itr_new++;
-					}
-					if (itr_list->name == itr_new->path().filename()){
+                    }*/
+                    if (itr_list->name == itr_new->path().filename()){
 						/*file bestond al*/
 						//cout << itr_list->name << endl;
 						itr_list++;
@@ -340,14 +346,18 @@ int Folder::updateDataFile(){//wat doen als er nog folders inzitten (overloaden 
 						/*itr_new is een nieuwe file (moet ingevoegd worden voor itr_list)*/
 
 						//while loop doen tot itr_new == itr_list of alle files overlopen zijn
-                        while (itr_new->path().filename() != itr_list->name && itr_new != directory_iterator()){//probleem!! hoofdlettergevoelig (File::exists niet)
-                            QString newFile = itr_new->path().filename().c_str();
+                        while (itr_new->path().filename() != itr_list->name && itr_new != std::experimental::filesystem::directory_iterator()){//probleem!! hoofdlettergevoelig (File::exists niet)
+                            QString newFile = itr_new->path().filename().string().c_str();
                             QString oldFile = itr_list->name.c_str();
                             if(oldFile.toLower() == newFile.toLower()){
                                 //ze zijn op de hoofdletters na gelijk
-                                itr_list->name = itr_new->path().filename();
-                            }else{
-                                File file(itr_new->path().filename(), dir_path.directory_string());
+                                itr_list->name = itr_new->path().filename().string();
+                            }else if(itr_new->path().filename() == DATA_FILE)
+                            {
+                                itr_new++;
+                            }
+                            else{
+                                File file(itr_new->path().filename().string(), this->name);
                                 file.lastWatched = NULL;//time(nullptr);
                                 this->files.insert(itr_list, file);
                                 cout << "++" << file.name << endl;
@@ -376,8 +386,8 @@ int Folder::updateDataFile(){//wat doen als er nog folders inzitten (overloaden 
 				}
 			}
 			//files na laatste toevoegen
-			while (itr_new != directory_iterator()){
-				File file(itr_new->path().filename(), dir_path.directory_string());
+            while (itr_new != std::experimental::filesystem::directory_iterator()){
+                File file(itr_new->path().filename().string(), this->name);
 				this->files.push_back(file);
 				itr_new++;
 			}
@@ -420,30 +430,30 @@ int Folder::getHighestRated(vector<File>& bestVideos){ //enkel deze met de hoogs
 }
 
 vector<File*> Folder::getHighestRated(){
-	std::vector<File*> sorted[11]; //pointers om geheugenruimte te sparen
+    std::vector<File*> sorted[11]; //pointers om geheugenruimte te sparen
 
-	std::vector<File>::iterator it = (this->files).begin();
+    std::vector<File>::iterator it = (this->files).begin();
 
-	std::vector<File>::iterator end = this->files.end();
+    std::vector<File>::iterator end = this->files.end();
 
-	while (it != end){
-		if (it->rating >= 0){
-			sorted[it->rating].push_back(&(*it));
-		}
-		it++;
-	}
+    while (it != end){
+        if (it->rating >= 0){
+            sorted[it->rating].push_back(&(*it));
+        }
+        it++;
+    }
 
-	std::vector<File*> highestRated;
+    std::vector<File*> highestRated;
 
-    unsigned int j = 10;
-	while (highestRated.size() < 10 && j >= 0){
+    int j = 10;
+    while (highestRated.size() < 10 && j >= 0){
         for (unsigned int i = 0; i < sorted[j].size(); i++){//misschien geen lus nodig? bestaat er een geoverloade versie die dit kan?
-			highestRated.push_back(sorted[j][i]);
-		}
-		j--;
-	}
+            highestRated.push_back(sorted[j][i]);
+        }
+        j--;
+    }
 
-	return highestRated;
+    return highestRated;
 
 }
 
@@ -484,7 +494,7 @@ File* Folder::findFile(string fileName){
         itr++;
     }
     cout << "File not found" << endl;
-    return NULL;
+    return nullptr;
 }
 
 /**
@@ -510,7 +520,7 @@ File* Folder::searchFile(std::string path, std::string name){
     }
 
     //FILE NOT FOUND
-    return NULL;
+    return nullptr;
 }
 
 #ifdef WITH_CONSOLE

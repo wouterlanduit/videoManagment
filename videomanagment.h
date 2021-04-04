@@ -10,6 +10,7 @@
 #include <QPoint>
 
 #include "files.h"
+#include "settings.h"
 
 namespace Ui {
 class VideoManagment;
@@ -19,11 +20,11 @@ class VideoManagment : public QMainWindow{
     Q_OBJECT
 
 public:
-    explicit VideoManagment(QWidget *parent = 0);
-    ~VideoManagment();
+    explicit VideoManagment(QWidget *parent = nullptr);
+    ~VideoManagment() override;
 
-    QString getStdFolder(){return this->pathOptions[0];}
-    void setStdFolder(QString folder){pathOptions[0]=folder;return;}
+    QString getStdFolder(){return settings.getSetting(OPTION_STDSEARCH);}
+    void setStdFolder(QString folder){settings.updateSetting(OPTION_STDSEARCH, folder);return;}
 
 protected:
     void closeEvent(QCloseEvent *event) Q_DECL_OVERRIDE;
@@ -42,10 +43,7 @@ private slots:
 private:
     Ui::VideoManagment *ui;
     Folder* folder;  //lijst van folder? (zodat er meerdere kunnen openstaan) en dan int om bij te houden welke je momenteel gebruikt
-    QString* pathOptions;
-        //1) standard search folder
-        //2) VLC folder
-        //3) standard opening folder
+    Settings settings;
 
     void setupTable();
     void fillTable(Folder*);

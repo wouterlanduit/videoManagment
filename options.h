@@ -1,30 +1,30 @@
-#ifndef _OPTIONS_H
-    #define _OPTIONS_H
+#ifndef OPTIONS_H
+#define OPTIONS_H
 
-    #define DATA_FILE "videomanagment.dat"
-    #define LOG_FILE "videomanagment.log"
-    #define SETTINGS_FILE "videomanagment.set"
-    #define FOLDER "c:\\users\\wouter\\documents\\varia\\youtube\\trailers"
-    #define NUM_OPTIONS 5
-        //1) standard search folder
-        //2) VLC location
-        //3) standard folder to open
-        //4) checkbox of previous
-        //5) play or rate by default
+#define DATA_FILE "videomanagment.dat"
+#define LOG_FILE "videomanagment.log"
+#define SETTINGS_FILE "videomanagment.set"
+#define NUM_OPTIONS 5
 
-    // Choose one of the following 3
-    #define USE_QT_PROCESS
-    //#define USE_SYSTEM
-    //#define USE_API
+#define OPTION_STDSEARCH 0          //1) standard search folder
+#define OPTION_VIDEO 1              //2) VLC location
+#define OPTION_STDOPEN 2            //3) standard folder to open
+#define OPTION_STDOPENCHECK 3       //4) checkbox of previous
+#define OPTION_DEFAULTCLICK 4       //5) play or rate by default
 
-    #define WITH_GUI
-    #ifndef WITH_GUI
-        #define WITH_CONSOLE
-    #endif
+// Choose one of the following 3
+#define USE_QT_PROCESS
+//#define USE_SYSTEM
+//#define USE_API
 
-    //#define USE_COMBOBOX
-    #ifndef USE_COMBOBOX
-        #define USE_SLIDER
-    #endif
+#define WITH_GUI
+#ifndef WITH_GUI
+    #define WITH_CONSOLE
+#endif
+
+//#define USE_COMBOBOX
+#ifndef USE_COMBOBOX
+    #define USE_SLIDER
+#endif
 
 #endif
